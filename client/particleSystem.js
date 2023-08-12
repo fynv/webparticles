@@ -60,7 +60,7 @@ export class ParticleSystem
 
         let num_groups = Math.floor((this.numGridCells + workgroup_size_2x - 1)/workgroup_size_2x);
         this.buf_workgroup_counter = engine_ctx.createBuffer0(4, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
-        this.buf_workgroup_state = engine_ctx.createBuffer0(num_groups * 3 *4, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
+        this.buf_workgroup_state = engine_ctx.createBuffer0(num_groups * 2 *4, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
         
         let hColor = new Float32Array(this.numParticles * 4);
         for (let i=0; i<this.numParticles; i++)
@@ -605,7 +605,8 @@ export class ParticleSystem
             engine_ctx.queue.writeBuffer(this.buf_workgroup_counter, 0, group_count.buffer, group_count.byteOffset, group_count.byteLength);
 
             let num_groups = Math.floor((this.numGridCells + workgroup_size_2x - 1)/workgroup_size_2x);
-            const group_state = new Uint32Array(num_groups*3);
+            const group_state = new Uint32Array(num_groups*2);
+            group_state.fill(0xFFFFFFFF);
             engine_ctx.queue.writeBuffer(this.buf_workgroup_state, 0, group_state.buffer, group_state.byteOffset, group_state.byteLength);
         }
 

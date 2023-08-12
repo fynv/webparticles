@@ -67,32 +67,32 @@ fn main(@builtin(local_invocation_id) LocalInvocationID : vec3<u32>)
     s_inclusive_prefix = 0;
     if (threadIdx == 0)
     {
-        atomicStore(&bWGState[blockIdx*3 + 1],  s_buf[${workgroup_size_2x} - 1]);
-        atomicStore(&bWGState[blockIdx*3], 1);
+        atomicStore(&bWGState[blockIdx*2],  s_buf[${workgroup_size_2x} - 1]);        
 
         var j = blockIdx;
         while(j>0)
         {
             j--;    
-            var state = 0u;
-            while(state<1u)
-            {
-                state = atomicLoad(&bWGState[j*3]);
-            }
             
-            if (state==2u)
+            var previous = 0xFFFFFFFFu;
+            while(previous == 0xFFFFFFFFu)
             {
-                s_inclusive_prefix+= atomicLoad(&bWGState[j*3 + 2]);
+                previous = atomicLoad(&bWGState[j*2]);
+            }
+
+            var prefix = atomicLoad(&bWGState[j*2 + 1]);            
+            if (prefix != 0xFFFFFFFFu)
+            {
+                s_inclusive_prefix+= prefix;
                 break;
             }
             else
             {
-                s_inclusive_prefix+= atomicLoad(&bWGState[j*3 + 1]);
+                s_inclusive_prefix+= previous;
             }
         }
 
-        atomicStore(&bWGState[blockIdx*3 + 2], s_buf[${workgroup_size_2x} - 1] + s_inclusive_prefix);
-        atomicStore(&bWGState[blockIdx*3], 2);
+        atomicStore(&bWGState[blockIdx*2 + 1], s_buf[${workgroup_size_2x} - 1] + s_inclusive_prefix);
     }
     workgroupBarrier();
 
