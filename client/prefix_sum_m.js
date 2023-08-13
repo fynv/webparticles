@@ -85,18 +85,28 @@ ${condition(has_group_buf,`
 
 function GetPipeline1(has_group_buf)
 {
-    let shaderModule = engine_ctx.device.createShaderModule({ code: get_shader1(has_group_buf) });
-    let bindGroupLayouts = [has_group_buf ? engine_ctx.cache.bindGroupLayouts.prefix_sum_1b : engine_ctx.cache.bindGroupLayouts.prefix_sum_1a];
-    const pipelineLayoutDesc = { bindGroupLayouts };
-    let layout = engine_ctx.device.createPipelineLayout(pipelineLayoutDesc);
+    if (!("prefix_sum_1" in engine_ctx.cache.pipelines))
+    {
+        engine_ctx.cache.pipelines.prefix_sum_1 = {};
+    }
 
-    return engine_ctx.device.createComputePipeline({
-        layout,
-        compute: {
-            module: shaderModule,
-            entryPoint: 'main',
-        },
-    });
+    if (!(has_group_buf in engine_ctx.cache.pipelines.prefix_sum_1))
+    {   
+        let shaderModule = engine_ctx.device.createShaderModule({ code: get_shader1(has_group_buf) });
+        let bindGroupLayouts = [has_group_buf ? engine_ctx.cache.bindGroupLayouts.prefix_sum_1b : engine_ctx.cache.bindGroupLayouts.prefix_sum_1a];
+        const pipelineLayoutDesc = { bindGroupLayouts };
+        let layout = engine_ctx.device.createPipelineLayout(pipelineLayoutDesc);
+        
+        engine_ctx.cache.pipelines.prefix_sum_1[has_group_buf] = engine_ctx.device.createComputePipeline({
+            layout,
+            compute: {
+                module: shaderModule,
+                entryPoint: 'main',
+            },
+        });
+    }
+
+    return engine_ctx.cache.pipelines.prefix_sum_1[has_group_buf];
 }
 
 
@@ -128,18 +138,23 @@ fn main(
 
 function GetPipeline2()
 {
-    let shaderModule = engine_ctx.device.createShaderModule({ code: get_shader2() });
-    let bindGroupLayouts = [engine_ctx.cache.bindGroupLayouts.prefix_sum_2];
-    const pipelineLayoutDesc = { bindGroupLayouts };
-    let layout = engine_ctx.device.createPipelineLayout(pipelineLayoutDesc);
+    if (!("prefix_sum_2" in engine_ctx.cache.pipelines))
+    {
+        let shaderModule = engine_ctx.device.createShaderModule({ code: get_shader2() });
+        let bindGroupLayouts = [engine_ctx.cache.bindGroupLayouts.prefix_sum_2];
+        const pipelineLayoutDesc = { bindGroupLayouts };
+        let layout = engine_ctx.device.createPipelineLayout(pipelineLayoutDesc);
 
-    return engine_ctx.device.createComputePipeline({
-        layout,
-        compute: {
-            module: shaderModule,
-            entryPoint: 'main',
-        },
-    });
+        engine_ctx.cache.pipelines.prefix_sum_2 = engine_ctx.device.createComputePipeline({
+            layout,
+            compute: {
+                module: shaderModule,
+                entryPoint: 'main',
+            },
+        });
+    }
+
+    return engine_ctx.cache.pipelines.prefix_sum_2;
 }
 
 export function PrefixSum(commandEncoder, psystem)

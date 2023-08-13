@@ -65,8 +65,7 @@ export class ParticleSystem
             this.dCellCountBufs.push(buf);
             this.dCellCountBufSizes.push(buf_size);
             buf_size = Math.floor((buf_size + workgroup_size_2x - 1)/workgroup_size_2x) - 1;
-        }
-        console.log(this.dCellCountBufSizes);
+        }        
         
         let hColor = new Float32Array(this.numParticles * 4);
         for (let i=0; i<this.numParticles; i++)
