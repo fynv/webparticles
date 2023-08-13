@@ -7,18 +7,15 @@ const cellSize = vec3(particleRadius * 2.0);
 const gridSize = vec3i(64);
 
 @group(0) @binding(0)
-var<uniform> uNumParicles: i32;
-
-@group(0) @binding(1)
 var<storage, read> bPos : array<vec4f>;
 
-@group(0) @binding(2)
+@group(0) @binding(1)
 var<storage, read_write> bGridParticleHash : array<u32>;
 
-@group(0) @binding(3)
+@group(0) @binding(2)
 var<storage, read_write> bGridParticleIndexInCell : array<u32>;
 
-@group(0) @binding(4)
+@group(0) @binding(3)
 var<storage, read_write> dCellCount : array<atomic<u32>>;
 
 fn calcGridPos(p: vec3f) -> vec3i
@@ -36,8 +33,8 @@ fn calcGridHash(gridPos: vec3i) -> u32
 @compute @workgroup_size(${workgroup_size},1,1)
 fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>)
 {
-    let idx = i32(GlobalInvocationID.x);
-    if (idx >= uNumParicles) 
+    let idx = GlobalInvocationID.x;
+    if (idx >= arrayLength(&bPos)) 
     {
         return;
     }

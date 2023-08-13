@@ -1,39 +1,35 @@
 const workgroup_size = 64;
 
 const shader_code = `
-
 @group(0) @binding(0)
-var<uniform> uNumParicles: u32;
-
-@group(0) @binding(1)
 var<storage, read> bPos : array<vec4f>;
 
-@group(0) @binding(2)
+@group(0) @binding(1)
 var<storage, read> bVel : array<vec4f>;
 
-@group(0) @binding(3)
+@group(0) @binding(2)
 var<storage, read> bCellPrefixSum : array<u32>;
 
-@group(0) @binding(4)
+@group(0) @binding(3)
 var<storage, read> bGridParticleHash : array<u32>;
 
-@group(0) @binding(5)
+@group(0) @binding(4)
 var<storage, read> bGridParticleIndexInCell : array<u32>;
 
-@group(0) @binding(6)
+@group(0) @binding(5)
 var<storage, read_write> bSortedPos : array<vec4f>;
 
-@group(0) @binding(7)
+@group(0) @binding(6)
 var<storage, read_write> bSortedVel : array<vec4f>;
 
-@group(0) @binding(8)
+@group(0) @binding(7)
 var<storage, read_write> bGridParticleIndex : array<u32>;
 
 @compute @workgroup_size(${workgroup_size},1,1)
 fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>)
 {
     let idx = GlobalInvocationID.x;
-    if (idx >= uNumParicles) 
+    if (idx >= arrayLength(&bGridParticleHash)) 
     {
         return;
     }

@@ -1,6 +1,6 @@
 import { Integrate } from "./integrate.js"
 import { HashCount } from "./hash_count.js"
-import { PrefixSum } from "./prefix_sum.js"
+import { PrefixSum } from "./prefix_sum_m.js"
 import { Scatter } from "./scatter.js"
 import { Collide } from "./collide.js"
 
@@ -55,12 +55,18 @@ export class ParticleSystem
         this.dGridParticleIndexInCell = engine_ctx.createBuffer0(this.numParticles * 4, GPUBufferUsage.STORAGE);
         this.dGridParticleIndex  = engine_ctx.createBuffer0(this.numParticles * 4, GPUBufferUsage.STORAGE);
 
-        this.dCellCount =  engine_ctx.createBuffer0(this.numGridCells * 4, GPUBufferUsage.STORAGE| GPUBufferUsage.COPY_DST);
-        this.dCellPrefixSum =  engine_ctx.createBuffer0(this.numGridCells * 4, GPUBufferUsage.STORAGE);
+        this.dCellCountBufs = [];
+        this.dCellCountBufSizes = [];
 
-        let num_groups = Math.floor((this.numGridCells + workgroup_size_2x - 1)/workgroup_size_2x);
-        this.buf_workgroup_counter = engine_ctx.createBuffer0(4, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
-        this.buf_workgroup_state = engine_ctx.createBuffer0(num_groups * 2 *4, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
+        let buf_size = this.numGridCells;
+        while (buf_size>0)
+        {
+            let buf = engine_ctx.createBuffer0(buf_size * 4, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);    
+            this.dCellCountBufs.push(buf);
+            this.dCellCountBufSizes.push(buf_size);
+            buf_size = Math.floor((buf_size + workgroup_size_2x - 1)/workgroup_size_2x) - 1;
+        }
+        console.log(this.dCellCountBufSizes);
         
         let hColor = new Float32Array(this.numParticles * 4);
         for (let i=0; i<this.numParticles; i++)
@@ -77,26 +83,16 @@ export class ParticleSystem
         
         this.dColor = engine_ctx.createBuffer(hColor.buffer, GPUBufferUsage.VERTEX);
 
-        this.dConstant = engine_ctx.createBuffer0(16, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
-        this.dConstant2 = engine_ctx.createBuffer0(16, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
-
         let layout_entries_integrate = [
             {
                 binding: 0,
-                visibility: GPUShaderStage.COMPUTE,
-                buffer:{
-                    type: "uniform"
-                }
-            },
-            {
-                binding: 1,
                 visibility: GPUShaderStage.COMPUTE,
                 buffer:{
                     type: "storage"
                 }
             },
             {
-                binding: 2,
+                binding: 1,
                 visibility: GPUShaderStage.COMPUTE,
                 buffer:{
                     type: "storage"
@@ -112,14 +108,14 @@ export class ParticleSystem
                 binding: 0,
                 visibility: GPUShaderStage.COMPUTE,
                 buffer:{
-                    type: "uniform"
+                    type: "read-only-storage"
                 }
             },
             {
                 binding: 1,
                 visibility: GPUShaderStage.COMPUTE,
                 buffer:{
-                    type: "read-only-storage"
+                    type: "storage"
                 }
             },
             {
@@ -131,13 +127,6 @@ export class ParticleSystem
             },
             {
                 binding: 3,
-                visibility: GPUShaderStage.COMPUTE,
-                buffer:{
-                    type: "storage"
-                }
-            },
-            {
-                binding: 4,
                 visibility: GPUShaderStage.COMPUTE,
                 buffer:{
                     type: "storage"
@@ -148,12 +137,36 @@ export class ParticleSystem
         let bindGroupLayoutHashCount = engine_ctx.device.createBindGroupLayout({ entries: layout_entries_hash_count });
         engine_ctx.cache.bindGroupLayouts.hash_count = bindGroupLayoutHashCount;
 
-        let layout_entries_prefix_sum = [
+        let layout_entries_prefix_sum1 = [ 
             {
                 binding: 0,
                 visibility: GPUShaderStage.COMPUTE,
                 buffer:{
-                    type: "uniform"
+                    type: "storage"
+                }
+            }
+        ];
+
+        let bindGroupLayoutPrefixSum1A = engine_ctx.device.createBindGroupLayout({ entries: layout_entries_prefix_sum1 });
+        engine_ctx.cache.bindGroupLayouts.prefix_sum_1a = bindGroupLayoutPrefixSum1A;
+
+        layout_entries_prefix_sum1.push({
+            binding: 1,
+            visibility: GPUShaderStage.COMPUTE,
+            buffer:{
+                type: "storage"
+            }
+        });
+    
+        let bindGroupLayoutPrefixSum1B = engine_ctx.device.createBindGroupLayout({ entries: layout_entries_prefix_sum1 });
+        engine_ctx.cache.bindGroupLayouts.prefix_sum_1b = bindGroupLayoutPrefixSum1B;
+
+        let layout_entries_prefix_sum2 = [
+            {
+                binding: 0,
+                visibility: GPUShaderStage.COMPUTE,
+                buffer:{
+                    type: "storage"
                 }
             },
             {
@@ -162,40 +175,20 @@ export class ParticleSystem
                 buffer:{
                     type: "read-only-storage"
                 }
-            },
-            {
-                binding: 2,
-                visibility: GPUShaderStage.COMPUTE,
-                buffer:{
-                    type: "storage"
-                }
-            },
-            {
-                binding: 3,
-                visibility: GPUShaderStage.COMPUTE,
-                buffer:{
-                    type: "storage"
-                }
-            },
-            {
-                binding: 4,
-                visibility: GPUShaderStage.COMPUTE,
-                buffer:{
-                    type: "storage"
-                }
-            },
-
+            }
         ];
+    
+        let bindGroupLayoutPrefixSum2 = engine_ctx.device.createBindGroupLayout({ entries: layout_entries_prefix_sum2 });
+        engine_ctx.cache.bindGroupLayouts.prefix_sum_2 = bindGroupLayoutPrefixSum2;
+    
 
-        let bindGroupLayoutPrefixSum = engine_ctx.device.createBindGroupLayout({ entries: layout_entries_prefix_sum });
-        engine_ctx.cache.bindGroupLayouts.prefix_sum = bindGroupLayoutPrefixSum;
 
-        let layout_entries_scatter = [
+        let layout_entries_scatter = [ 
             {
                 binding: 0,
                 visibility: GPUShaderStage.COMPUTE,
                 buffer:{
-                    type: "uniform"
+                    type: "read-only-storage"
                 }
             },
             {
@@ -230,7 +223,7 @@ export class ParticleSystem
                 binding: 5,
                 visibility: GPUShaderStage.COMPUTE,
                 buffer:{
-                    type: "read-only-storage"
+                    type: "storage"
                 }
             },
             {
@@ -242,13 +235,6 @@ export class ParticleSystem
             },
             {
                 binding: 7,
-                visibility: GPUShaderStage.COMPUTE,
-                buffer:{
-                    type: "storage"
-                }
-            },
-            {
-                binding: 8,
                 visibility: GPUShaderStage.COMPUTE,
                 buffer:{
                     type: "storage"
@@ -265,14 +251,14 @@ export class ParticleSystem
                 binding: 0,
                 visibility: GPUShaderStage.COMPUTE,
                 buffer:{
-                    type: "uniform"
+                    type: "storage"
                 }
             },
             {
                 binding: 1,
                 visibility: GPUShaderStage.COMPUTE,
                 buffer:{
-                    type: "storage"
+                    type: "read-only-storage"
                 }
             },
             {
@@ -291,13 +277,6 @@ export class ParticleSystem
             },
             {
                 binding: 4,
-                visibility: GPUShaderStage.COMPUTE,
-                buffer:{
-                    type: "read-only-storage"
-                }
-            },
-            {
-                binding: 5,
                 visibility: GPUShaderStage.COMPUTE,
                 buffer:{
                     type: "read-only-storage"
@@ -313,17 +292,11 @@ export class ParticleSystem
             {
                 binding: 0,
                 resource:{
-                    buffer: this.dConstant
-                }
-            },
-            {
-                binding: 1,
-                resource:{
                     buffer: this.dPos            
                 }
             },
             {
-                binding: 2,
+                binding: 1,
                 resource:{
                     buffer: this.dVel            
                 }
@@ -336,31 +309,25 @@ export class ParticleSystem
             {
                 binding: 0,
                 resource:{
-                    buffer: this.dConstant
+                    buffer: this.dPos            
                 }
             },
             {
                 binding: 1,
                 resource:{
-                    buffer: this.dPos            
+                    buffer: this.dGridParticleHash
                 }
             },
             {
                 binding: 2,
                 resource:{
-                    buffer: this.dGridParticleHash
+                    buffer: this.dGridParticleIndexInCell
                 }
             },
             {
                 binding: 3,
                 resource:{
-                    buffer: this.dGridParticleIndexInCell
-                }
-            },
-            {
-                binding: 4,
-                resource:{
-                    buffer: this.dCellCount
+                    buffer: this.dCellCountBufs[0]
                 }
             },
 
@@ -368,92 +335,97 @@ export class ParticleSystem
 
         this.bind_group_hash_count = engine_ctx.device.createBindGroup({ layout: bindGroupLayoutHashCount, entries: group_entries_hash_count});
 
-        let group_entries_prefix_sum = [
-            {
-                binding: 0,
-                resource:{
-                    buffer: this.dConstant2
-                }
-            },
-            {
-                binding: 1,
-                resource:{
-                    buffer: this.dCellCount            
-                }
-            },
-            {
-                binding: 2,
-                resource:{
-                    buffer: this.dCellPrefixSum            
-                }
-            },
-            {
-                binding: 3,
-                resource:{
-                    buffer: this.buf_workgroup_counter            
-                }
-            },
-            {
-                binding: 4,
-                resource:{
-                    buffer: this.buf_workgroup_state            
-                }
-            },
-        ];
+        this.bind_group_prefix_sum1 = [];
+        this.bind_group_prefix_sum2 = [];
 
-        this.bind_group_prefix_sum = engine_ctx.device.createBindGroup({ layout: bindGroupLayoutPrefixSum, entries: group_entries_prefix_sum});
+        for (let i=0; i<this.dCellCountBufs.length; i++)
+        {
+            if (i<this.dCellCountBufs.length - 1)
+            {
+                let group_entries = [ 
+                    {
+                        binding: 0,
+                        resource:{
+                            buffer: this.dCellCountBufs[i]            
+                        }
+                    },
+                    {
+                        binding: 1,
+                        resource:{
+                            buffer: this.dCellCountBufs[i+1]
+                        }
+                    }       
+                ];
+                {
+                    let bind_group = engine_ctx.device.createBindGroup({ layout: bindGroupLayoutPrefixSum1B, entries: group_entries});
+                    this.bind_group_prefix_sum1.push(bind_group);
+                }
+                {
+                    let bind_group = engine_ctx.device.createBindGroup({ layout: bindGroupLayoutPrefixSum2, entries: group_entries});
+                    this.bind_group_prefix_sum2.push(bind_group);
+                }
+            }
+            else if (this.dCellCountBufSizes[i] > 1)
+            {
+                let group_entries = [ 
+                    {
+                        binding: 0,
+                        resource:{
+                            buffer: this.dCellCountBufs[i]            
+                        }
+                    }              
+                ];
+                let bind_group = engine_ctx.device.createBindGroup({ layout: bindGroupLayoutPrefixSum1A, entries: group_entries});
+                this.bind_group_prefix_sum1.push(bind_group);
+            }
 
+        }
+    
         let group_entries_scatter = [
             {
                 binding: 0,
-                resource:{
-                    buffer: this.dConstant
-                }
-            },
-            {
-                binding: 1,
                 resource:{
                     buffer: this.dPos            
                 }
             },
             {
-                binding: 2,
+                binding: 1,
                 resource:{
                     buffer: this.dVel            
                 }
             },
             {
-                binding: 3,
+                binding: 2,
                 resource:{
-                    buffer: this.dCellPrefixSum            
+                    buffer: this.dCellCountBufs[0]            
                 }
             },
             {
-                binding: 4,
+                binding: 3,
                 resource:{
                     buffer: this.dGridParticleHash            
                 }
             },
             {
-                binding: 5,
+                binding: 4,
                 resource:{
                     buffer: this.dGridParticleIndexInCell            
                 }
             },
             {
-                binding: 6,
+                binding: 5,
                 resource:{
                     buffer: this.dSortedPos            
                 }
             },
             {
-                binding: 7,
+                binding: 6,
                 resource:{
                     buffer: this.dSortedVel            
                 }
             },
             {
-                binding: 8,
+                binding: 7,
                 resource:{
                     buffer: this.dGridParticleIndex            
                 }
@@ -466,37 +438,31 @@ export class ParticleSystem
             {
                 binding: 0,
                 resource:{
-                    buffer: this.dConstant
+                    buffer: this.dVel            
                 }
             },
             {
                 binding: 1,
                 resource:{
-                    buffer: this.dVel            
+                    buffer: this.dSortedPos            
                 }
             },
             {
                 binding: 2,
                 resource:{
-                    buffer: this.dSortedPos            
+                    buffer: this.dSortedVel            
                 }
             },
             {
                 binding: 3,
                 resource:{
-                    buffer: this.dSortedVel            
+                    buffer: this.dGridParticleIndex            
                 }
             },
             {
                 binding: 4,
                 resource:{
-                    buffer: this.dGridParticleIndex            
-                }
-            },
-            {
-                binding: 5,
-                resource:{
-                    buffer: this.dCellPrefixSum            
+                    buffer: this.dCellCountBufs[0]            
                 }
             }
         ];
@@ -581,33 +547,11 @@ export class ParticleSystem
         engine_ctx.queue.writeBuffer(this.dVel, 0, this.hVel.buffer, 0, index * 4 * 4);
     }
 
-    update(deltaTime)
+    update()
     {
         {
-            const uniform = new Int32Array(4);
-            const funiform = new Float32Array(uniform.buffer);
-            uniform[0] = this.numParticles;
-            funiform[1] = deltaTime;
-            engine_ctx.queue.writeBuffer(this.dConstant, 0, uniform.buffer, uniform.byteOffset, uniform.byteLength);
-        }
-
-        {
-            const uniform = new Int32Array(4);            
-            uniform[0] = this.numGridCells;            
-            engine_ctx.queue.writeBuffer(this.dConstant2, 0, uniform.buffer, uniform.byteOffset, uniform.byteLength);
-        }
-
-        {
             const cell_count = new Uint32Array(this.numGridCells);        
-            engine_ctx.queue.writeBuffer(this.dCellCount, 0, cell_count.buffer, cell_count.byteOffset, cell_count.byteLength);
-
-            const group_count = new Uint32Array(1);    
-            engine_ctx.queue.writeBuffer(this.buf_workgroup_counter, 0, group_count.buffer, group_count.byteOffset, group_count.byteLength);
-
-            let num_groups = Math.floor((this.numGridCells + workgroup_size_2x - 1)/workgroup_size_2x);
-            const group_state = new Uint32Array(num_groups*2);
-            group_state.fill(0xFFFFFFFF);
-            engine_ctx.queue.writeBuffer(this.buf_workgroup_state, 0, group_state.buffer, group_state.byteOffset, group_state.byteLength);
+            engine_ctx.queue.writeBuffer(this.dCellCountBufs[0], 0, cell_count.buffer, cell_count.byteOffset, cell_count.byteLength);            
         }
 
         let commandEncoder = engine_ctx.device.createCommandEncoder();    

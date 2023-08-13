@@ -11,21 +11,18 @@ const damping = 0.02;
 const shear = 0.1;
 
 @group(0) @binding(0)
-var<uniform> uNumParicles: u32;
-
-@group(0) @binding(1)
 var<storage, read_write> bVel : array<vec4f>;
 
-@group(0) @binding(2)
+@group(0) @binding(1)
 var<storage, read> bSortedPos : array<vec4f>;
 
-@group(0) @binding(3)
+@group(0) @binding(2)
 var<storage, read> bSortedVel : array<vec4f>;
 
-@group(0) @binding(4)
+@group(0) @binding(3)
 var<storage, read> bGridParticleIndex : array<u32>;
 
-@group(0) @binding(5)
+@group(0) @binding(4)
 var<storage, read> bCellPrefixSum : array<u32>;
 
 fn calcGridPos(p: vec3f) -> vec3i
@@ -90,7 +87,7 @@ fn collideCell(gridPos: vec3i, idx: u32, pos: vec3f, vel: vec3f) -> vec3f
 fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>)
 {
     let idx = GlobalInvocationID.x;
-    if (idx >= uNumParicles) 
+    if (idx >= arrayLength(&bSortedPos)) 
     {
         return;
     }

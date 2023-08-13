@@ -1,31 +1,23 @@
 const workgroup_size = 64;
 
 const shader_code = `
-struct Params
-{
-    numParticles: i32,
-    deltaTime: f32
-};
-
+const deltaTime = 0.5;
 const gravity = vec3(0.0, -0.0003, 0.0);
 const globalDamping = 1.0;
 const particleRadius = 1.0/ 64.0;
 const boundaryDamping = -0.5;
 
 @group(0) @binding(0)
-var<uniform> uParams: Params;
-
-@group(0) @binding(1)
 var<storage, read_write> bPos : array<vec4f>;
 
-@group(0) @binding(2)
+@group(0) @binding(1)
 var<storage, read_write> bVel : array<vec4f>;
 
 @compute @workgroup_size(${workgroup_size},1,1)
 fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>)
 {
-    let idx = i32(GlobalInvocationID.x);
-    if (idx >=uParams.numParticles) 
+    let idx = GlobalInvocationID.x;
+    if (idx >= arrayLength(&bPos))
     {
         return;
     }
@@ -33,10 +25,10 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>)
     var pos = bPos[idx].xyz;
     var vel = bVel[idx].xyz;
 
-    vel += gravity * uParams.deltaTime;
+    vel += gravity * deltaTime;
     vel *= globalDamping;
 
-    pos += vel * uParams.deltaTime;
+    pos += vel * deltaTime;
 
     if (pos.x > 1.0 - particleRadius)
     {

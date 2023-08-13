@@ -3,18 +3,12 @@ const workgroup_size_2x = workgroup_size*2;
 
 const shader_code = `
 @group(0) @binding(0)
-var<uniform> uCount: u32;
-
-@group(0) @binding(1)
-var<storage, read> bInput : array<u32>;
-
-@group(0) @binding(2)
 var<storage, read_write> bOutput : array<u32>;
 
-@group(0) @binding(3)
+@group(0) @binding(1)
 var<storage, read_write> bWGCounter : atomic<u32>;
 
-@group(0) @binding(4)
+@group(0) @binding(2)
 var<storage, read_write> bWGState : array<atomic<u32>>;
 
 var<workgroup> s_workgroup_idx : u32;
@@ -32,17 +26,19 @@ fn main(@builtin(local_invocation_id) LocalInvocationID : vec3<u32>)
     workgroupBarrier();
 
     let blockIdx = s_workgroup_idx; 
+
+    let count = arrayLength(&bOutput);
     
     var i = threadIdx + blockIdx*${workgroup_size_2x};
-    if (i<uCount)
+    if (i<count)
     {
-        s_buf[threadIdx] = bInput[i];
+        s_buf[threadIdx] = bOutput[i];
     }
 
     i = threadIdx + ${workgroup_size} + blockIdx*${workgroup_size_2x};
-    if (i<uCount)
+    if (i<count)
     {
-        s_buf[threadIdx + ${workgroup_size}] = bInput[i];
+        s_buf[threadIdx + ${workgroup_size}] = bOutput[i];
     }
 
     workgroupBarrier();
@@ -55,7 +51,7 @@ fn main(@builtin(local_invocation_id) LocalInvocationID : vec3<u32>)
         let gid = threadIdx/half_size_group;
         let tid = gid*size_group + half_size_group + threadIdx % half_size_group;
         i = tid + blockIdx*${workgroup_size_2x};
-        if (i<uCount)
+        if (i<count)
         {
             s_buf[tid] = s_buf[gid*size_group + half_size_group -1] + s_buf[tid];
         }
@@ -97,13 +93,13 @@ fn main(@builtin(local_invocation_id) LocalInvocationID : vec3<u32>)
     workgroupBarrier();
 
     i = threadIdx + blockIdx*${workgroup_size_2x};
-    if (i<uCount)
+    if (i<count)
     {
         bOutput[i] = s_buf[threadIdx] + s_inclusive_prefix;
     }
     
     i = threadIdx + ${workgroup_size} + blockIdx*${workgroup_size_2x};
-    if (i<uCount)
+    if (i<count)
     {
         bOutput[i] = s_buf[threadIdx + ${workgroup_size}] + s_inclusive_prefix;
     }
