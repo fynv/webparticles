@@ -20,6 +20,11 @@ const c = [
 
 const particleRadius = 1.0 / 64.0;
 
+function getRandomInt(max) 
+{
+    return Math.floor(Math.random() * max);
+}
+
 export class ParticleSystem
 {
     constructor(numParticles, gridSize)
@@ -544,6 +549,112 @@ export class ParticleSystem
 
         engine_ctx.queue.writeBuffer(this.dPos, 0, this.hPos.buffer, 0, index * 4 * 4);
         engine_ctx.queue.writeBuffer(this.dVel, 0, this.hVel.buffer, 0, index * 4 * 4);
+    }
+
+    default()
+    {
+        if (!("frame" in this))
+        {
+            this.frame = 0;
+        }
+
+        if (this.frame++>1000)
+        {
+            let ballr = 10 + getRandomInt(10);
+            let tr = particleRadius + particleRadius * 2.0  * ballr;
+            let pos = [ -1.0 + tr + Math.random() *(2.0 - tr*2.0), 1.0 - tr,  -1.0 + tr + Math.random() *(2.0 - tr*2.0)];
+            this.addSphere(pos, ballr);
+            this.frame = 0;
+        }
+    }
+
+    flow()
+    {        
+        if (!("flow_pos" in this))
+        {
+            this.flow_pos = 0;
+            this.flow_frame = 0;
+        }
+
+        let length = 16;
+        let count = length*length;
+        let rate = 5;
+        let speed = particleRadius*2.0 / 0.5 /rate;
+
+        if (this.flow_frame==0)
+        {
+            for (let i=0; i<length; i++)
+            {
+                for (let j=0; j<length; j++)
+                {
+                    let index = this.flow_pos + j + i*length;
+
+                    this.hPos[index*4] = -1.0 + particleRadius;
+                    this.hPos[index*4 + 1] = 1.0 - particleRadius - i * particleRadius * 2.0;
+                    this.hPos[index*4 + 2] = (j-(length-1)*0.5) * particleRadius * 2.0;
+                    this.hPos[index*4 + 3] = 1.0;
+
+                    this.hVel[index*4] = speed;
+                    this.hVel[index*4 + 1] = 0.0;
+                    this.hVel[index*4 + 2] = 0.0;
+                    this.hVel[index*4 + 3] = 0.0;
+                }
+            }
+
+            engine_ctx.queue.writeBuffer(this.dPos, this.flow_pos*4*4, this.hPos.buffer, this.flow_pos*4*4, count*4*4);
+            engine_ctx.queue.writeBuffer(this.dVel, this.flow_pos*4*4, this.hVel.buffer, this.flow_pos*4*4, count*4*4);        
+
+            this.flow_pos = (this.flow_pos + count) % this.numParticles;
+        }
+        this.flow_frame = (this.flow_frame + 1) % rate;
+
+    }
+
+    flow2()
+    {
+        if (!("flow_pos" in this))
+        {
+            this.flow_pos = 0;
+            this.flow_frame = 0;
+        }
+
+        let count = 256;
+        let radius = Math.sqrt(count / (Math.PI)) *  particleRadius * 2.0;
+        let rate = 5;
+        let speed = particleRadius*2.0 / 0.5 /rate;
+
+
+        if (this.flow_frame==0)
+        {
+            let jitter = Math.random();
+            for (let i=0; i< count; i++)
+            {
+                let index = this.flow_pos + i;
+
+                let r = Math.sqrt((i+0.5)/count) * radius;
+                let theta = i * 2.4 + jitter * 2.0 * Math.PI;     
+
+                let x = r * Math.cos(theta);
+                let y = r * Math.sin(theta);
+
+                this.hPos[index*4] = -1.0 + particleRadius;
+                this.hPos[index*4 + 1] = 1.0 - particleRadius - radius + y;
+                this.hPos[index*4 + 2] = x;
+                this.hPos[index*4 + 3] = 1.0;
+
+                this.hVel[index*4] = speed;
+                this.hVel[index*4 + 1] = 0.0;
+                this.hVel[index*4 + 2] = 0.0;
+                this.hVel[index*4 + 3] = 0.0;
+
+            }
+
+            engine_ctx.queue.writeBuffer(this.dPos, this.flow_pos*4*4, this.hPos.buffer, this.flow_pos*4*4, count*4*4);
+            engine_ctx.queue.writeBuffer(this.dVel, this.flow_pos*4*4, this.hVel.buffer, this.flow_pos*4*4, count*4*4);
+
+            this.flow_pos = (this.flow_pos + count) % this.numParticles;
+        }
+        this.flow_frame = (this.flow_frame + 1) % rate;
     }
 
     update()

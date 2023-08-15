@@ -7,8 +7,6 @@ import { Color } from "./engine/math/Color.js"
 
 import { ParticleSystem } from "./particleSystem.js"
 
-const particleRadius = 1.0 / 64.0;
-
 const shader_code =`
 struct Camera
 {
@@ -171,12 +169,6 @@ function GetPipelineRender(view_format)
 
 }
 
-
-function getRandomInt(max) 
-{
-    return Math.floor(Math.random() * max);
-}
-
 export async function test()
 {
     const canvas = document.getElementById('gfx');
@@ -212,8 +204,7 @@ export async function test()
     controls.target.set(0,0,0); 
     controls.enableDamping = true; 
 
-    let pipeline_render = null;
-    let counter = 0;
+    let pipeline_render = null;    
 
     const render = () =>
     {
@@ -291,15 +282,10 @@ export async function test()
 
         let cmdBuf = commandEncoder.finish();
         engine_ctx.queue.submit([cmdBuf]);        
-
-        if (counter++>1000)
-        {
-            let ballr = 10 + getRandomInt(10);
-            let tr = particleRadius + particleRadius * 2.0  * ballr;
-            let pos = [ -1.0 + tr + Math.random() *(2.0 - tr*2.0), 1.0 - tr,  -1.0 + tr + Math.random() *(2.0 - tr*2.0)];
-            psystem.addSphere(pos, ballr);
-            counter = 0;
-        }
+        
+        //psystem.default();
+        //psystem.flow();  
+        psystem.flow2();  
 
         requestAnimationFrame(render);
     };
